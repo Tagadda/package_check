@@ -405,7 +405,7 @@ break_before_continue () {
     if [ $interactive -eq 1 ]
     then
         echo "To enter a shell on the lxc:"
-        echo "     lxc exec $LXC_NAME bash"
+        echo "     lxc exec $LXC_FULLNAME bash"
         read -p "Press a key to delete the application and continue...." < /dev/tty
     fi
 }

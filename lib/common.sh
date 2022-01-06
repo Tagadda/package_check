@@ -5,6 +5,7 @@ YUNO_PWD="admin"
 DOMAIN="domain.tld"
 SUBDOMAIN="sub.$DOMAIN"
 TEST_USER="package_checker"
+LXC_REMOTE="local"
 
 [[ -e "./config" ]] && source "./config"
 
@@ -17,6 +18,7 @@ YNH_BRANCH=${YNH_BRANCH:-stable}
 WORKER_ID=${WORKER_ID:-0}
 LXC_BASE="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-base"
 LXC_NAME="ynh-appci-$DIST-$ARCH-$YNH_BRANCH-test-${WORKER_ID}"
+LXC_FULLNAME="$LXC_REMOTE:$LXC_NAME"
 
 readonly lock_file="./pcheck-${WORKER_ID}.lock"
 

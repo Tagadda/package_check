@@ -5,18 +5,18 @@
 #=================================================
 
 LXC_CREATE () {
-    log_info "Launching new LXC $LXC_NAME ..."
+    log_info "Launching new LXC $LXC_FULLNAME ..."
     # Check if we can launch container from yunohost remote image
     if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$LXC_BASE | grep -q -w $LXC_BASE; then
-        lxc launch yunohost:$LXC_BASE $LXC_NAME \
+        lxc launch yunohost:$LXC_BASE $LXC_FULLNAME \
             -c security.nesting=true \
             -c security.privileged=true \
             -c limits.memory=80% \
             -c limits.cpu.allowance=80% \
             >>/proc/self/fd/3
     # Check if we can launch container from a local image
-    elif lxc image list $LXC_BASE | grep -q -w $LXC_BASE; then
-        lxc launch $LXC_BASE $LXC_NAME \
+    elif lxc image list $LXC_REMOTE: $LXC_BASE | grep -q -w $LXC_BASE; then
+        lxc launch $LXC_BASE $LXC_FULLNAME \
             -c security.nesting=true \
             -c security.privileged=true \
             -c limits.memory=80% \
@@ -27,19 +27,19 @@ LXC_CREATE () {
     fi
     
     pipestatus="${PIPESTATUS[0]}"
-    location=$(lxc list --format json | jq -e --arg LXC_NAME $LXC_NAME '.[] | select(.name==$LXC_NAME) | .location' | tr -d '"')
+    location=$(lxc list $LXC_REMOTE: --format json | jq -e --arg LXC_NAME $LXC_NAME '.[] | select(.name==$LXC_NAME) | .location' | tr -d '"')
     [[ "$location" != "none" ]] && log_info "... on $location"
 
     [[ "$pipestatus" -eq 0 ]] || exit 1
 
-    _LXC_START_AND_WAIT $LXC_NAME
+    _LXC_START_AND_WAIT $LXC_FULLNAME
     set_witness_files
-    lxc snapshot $LXC_NAME snap0
+    lxc snapshot $LXC_FULLNAME snap0
 }
 
 LXC_SNAPSHOT_EXISTS() {
     local snapname=$1
-    lxc list --format json \
+    lxc list $LXC_REMOTE: --format json \
         | jq -e --arg LXC_NAME $LXC_NAME --arg snapname $snapname \
         '.[] | select(.name==$LXC_NAME) | .snapshots[] | select(.name==$snapname)' \
             >/dev/null
@@ -58,16 +58,16 @@ CREATE_LXC_SNAPSHOT () {
     # Remove swap files to avoid killing the CI with huge snapshots.
     CLEAN_SWAPFILES
     
-    LXC_STOP $LXC_NAME
+    LXC_STOP $LXC_FULLNAME
 
     # Check if the snapshot already exist
     if ! LXC_SNAPSHOT_EXISTS "$snapname"
     then
         log_info "(Creating snapshot $snapname ...)"
-        lxc snapshot $LXC_NAME $snapname
+        lxc snapshot $LXC_FULLNAME $snapname
     fi
 
-    _LXC_START_AND_WAIT $LXC_NAME
+    _LXC_START_AND_WAIT $LXC_FULLNAME
 
     stop_timer 1
 }
@@ -79,11 +79,11 @@ LOAD_LXC_SNAPSHOT () {
     # Remove swap files before restoring the snapshot.
     CLEAN_SWAPFILES
 
-    LXC_STOP $LXC_NAME
+    LXC_STOP $LXC_FULLNAME
 
-    lxc restore $LXC_NAME $snapname
-    lxc start $LXC_NAME
-    _LXC_START_AND_WAIT $LXC_NAME
+    lxc restore $LXC_FULLNAME $snapname
+    lxc start $LXC_FULLNAME
+    _LXC_START_AND_WAIT $LXC_FULLNAME
 }
 
 #=================================================
@@ -92,12 +92,12 @@ LXC_EXEC () {
     # Start the lxc container and execute the given command in it
     local cmd=$1
 
-    _LXC_START_AND_WAIT $LXC_NAME
+    _LXC_START_AND_WAIT $LXC_FULLNAME
 
     start_timer
 
     # Execute the command given in argument in the container and log its results.
-    lxc exec $LXC_NAME --env PACKAGE_CHECK_EXEC=1 -t -- /bin/bash -c "$cmd" | tee -a "$complete_log" $current_test_log
+    lxc exec $LXC_FULLNAME --env PACKAGE_CHECK_EXEC=1 -t -- /bin/bash -c "$cmd" | tee -a "$complete_log" $current_test_log
 
     # Store the return code of the command
     local returncode=${PIPESTATUS[0]}
@@ -119,19 +119,18 @@ LXC_STOP () {
     if [ $? -eq 124 ]; then
         timeout 30 lxc stop --timeout 15 $container_to_stop --force 2>/dev/null
     fi
-
 }
 
 LXC_RESET () {
     # If the container exists
-    if lxc info $LXC_NAME >/dev/null 2>/dev/null; then
+    if lxc info $LXC_FULLNAME >/dev/null 2>/dev/null; then
         # Remove swap files before deletting the continer
         CLEAN_SWAPFILES
     fi 
 
-    LXC_STOP $LXC_NAME
+    LXC_STOP $LXC_FULLNAME
 
-    lxc delete $LXC_NAME --force 2>/dev/null
+    lxc delete $LXC_FULLNAME --force 2>/dev/null
 }
 
 
@@ -204,15 +203,15 @@ _LXC_START_AND_WAIT() {
 
 CLEAN_SWAPFILES() {
     # Restart it if needed
-    if [ "$(lxc info $LXC_NAME | grep Status | awk '{print tolower($2)}')" != "running" ]; then
-        lxc start $LXC_NAME
-        _LXC_START_AND_WAIT $LXC_NAME
+    if [ "$(lxc info $LXC_FULLNAME | grep Status | awk '{print tolower($2)}')" != "running" ]; then
+        lxc start $LXC_FULLNAME
+        _LXC_START_AND_WAIT $LXC_FULLNAME
     fi
-    lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
-    lxc exec $LXC_NAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done'
+    lxc exec $LXC_FULLNAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do swapoff $swapfile; done'
+    lxc exec $LXC_FULLNAME -- bash -c 'for swapfile in $(ls /swap_* 2>/dev/null); do rm -f $swapfile; done'
 }
 
 RUN_INSIDE_LXC() {
-    lxc exec $LXC_NAME -- "$@"
+    lxc exec $LXC_FULLNAME -- "$@"
 }
 
