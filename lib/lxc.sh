@@ -9,18 +9,12 @@ LXC_CREATE () {
     # Check if we can launch container from yunohost remote image
     if lxc remote list | grep -q "yunohost" && lxc image list yunohost:$LXC_BASE | grep -q -w $LXC_BASE; then
         lxc launch yunohost:$LXC_BASE $LXC_FULLNAME \
-            -c security.nesting=true \
-            -c security.privileged=true \
-            -c limits.memory=80% \
-            -c limits.cpu.allowance=80% \
+            -p yunohost-ci \
             >>/proc/self/fd/3
     # Check if we can launch container from a local image
     elif lxc image list $LXC_REMOTE: $LXC_BASE | grep -q -w $LXC_BASE; then
         lxc launch $LXC_BASE $LXC_FULLNAME \
-            -c security.nesting=true \
-            -c security.privileged=true \
-            -c limits.memory=80% \
-            -c limits.cpu.allowance=80% \
+            -p yunohost-ci \
             >>/proc/self/fd/3
     else
         log_critical "Can't find base image $LXC_BASE, run ./package_check.sh --rebuild"
