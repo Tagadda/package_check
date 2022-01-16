@@ -413,13 +413,13 @@ TEST_UPGRADE () {
     if [ "$commit" == "" ]
     then
         start_test "Upgrade from the same version"
+
+        at_least_one_install_succeeded || return 1
     else
         upgrade_name="$(jq -r '.extra.upgrade_name' $current_test_infos)"
         [ -n "$upgrade_name" ] || upgrade_name="commit $commit"
         start_test "Upgrade from $upgrade_name"
     fi
-
-    at_least_one_install_succeeded || return 1
 
     local check_path="$(default_install_path)"
 
