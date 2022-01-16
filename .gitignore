@@ -2,6 +2,8 @@
 *~
 Notes
 config
+package_linter
+.apps
 
 .apps_git_clone_cache
 .plinter_version
@@ -9,5 +11,7 @@ config
 
 *.log
 curl_print
+results-*.json
+summary.png
 
 *.lock
