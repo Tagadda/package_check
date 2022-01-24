@@ -32,6 +32,7 @@ DEFAULT_PHP_VERSION="7.3"
 assert_we_are_connected_to_the_internets() {
     ping -q -c 2 yunohost.org > /dev/null 2>&1 \
     || ping -q -c 2 framasoft.org > /dev/null 2>&1 \
+    || [ "$LXC_REMOTE" != "local" ] \
     || log_critical "Unable to connect to internet."
 }
 
@@ -56,6 +57,7 @@ function check_lxd_setup()
     fi
 
     ip a | grep -q lxdbr0 \
+        || [ "$LXC_REMOTE" != "local" ] \
         || log_critical "There is no 'lxdbr0' interface... Did you ran 'lxd init' ?"
 }
 
