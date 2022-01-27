@@ -358,10 +358,15 @@ TEST_INSTALL () {
 
     LOAD_LXC_SNAPSHOT snap0
 
+    MONITOR_STATS_START "1-preinstall"
+
     _PREINSTALL
+
+    MONITOR_STATS_STEP "2-install"
 
     # Install the application in a LXC container
     _INSTALL_APP "path=$check_path" "is_public=$is_public" \
+        && MONITOR_STATS_STOP \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "$install_type" \
 
     local install=$?
@@ -374,10 +379,14 @@ TEST_INSTALL () {
         && log_debug "Create a snapshot after app install" \
         && CREATE_LXC_SNAPSHOT $snapname
 
+    MONITOR_STATS_START "3-removal"
+
     # Remove and reinstall the application
     _REMOVE_APP \
         && log_small_title "Reinstalling after removal." \
-        &&_INSTALL_APP "path=$check_path" "is_public=$is_public" \
+        && MONITOR_STATS_STEP "4-reinstall" \
+        && _INSTALL_APP "path=$check_path" "is_public=$is_public" \
+        && MONITOR_STATS_STOP \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "$install_type"
 
     return $?
@@ -464,8 +473,11 @@ TEST_UPGRADE () {
     ret=$?
     [ $ret -eq 0 ] || { log_error "Pre-upgrade instruction failed"; return 1; }
 
+    MONITOR_STATS_START "1upgrade"
+
     # Upgrade the application in a LXC container
     _RUN_YUNOHOST_CMD "app upgrade $app_id --file /app_folder --force" \
+        && MONITOR_STATS_STOP \
         && _VALIDATE_THAT_APP_CAN_BE_ACCESSED "$SUBDOMAIN" "$check_path" "upgrade"
 
     return $?

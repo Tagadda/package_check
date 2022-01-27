@@ -3,6 +3,7 @@ import json
 import os
 import time
 import imgkit
+import glob
 
 def load_tests(test_folder):
 
@@ -12,6 +13,10 @@ def load_tests(test_folder):
         j["id"] = os.path.basename(test).split(".")[0]
         j["results"] = json.load(open(test_folder + "/results/" + j["id"] + ".json"))
         j["notes"] = list(test_notes(j))
+        j["stats"] = {
+            "disk": list(test_disk_stats(j, test_folder)),
+            "ram": list(test_ram_usage(j, test_folder))
+        }
 
         yield j
 
@@ -43,6 +48,20 @@ def test_notes(test):
     if test['results'].get("install_dir_permissions"):
         yield '<style=danger>Unsafe install dir permissions</style>'
 
+def test_disk_stats(test, test_folder):
+    if test["test_type"] not in ["TEST_UPGRADE", "TEST_INSTALL"]:
+        return {}
+
+    for step in glob.glob(f"{test_folder}/monitor/{test['id']}/*-disk.json"):
+        yield [step, json.load(open(step))]
+        
+
+def test_ram_usage(test, test_folder):
+    if test["test_type"] not in ["TEST_UPGRADE", "TEST_INSTALL"]:
+        return {}
+
+    for step in glob.glob(f"{test_folder}/monitor/{test['id']}/*-ram.json"):
+        yield [step, json.load(open(step))]
 
 levels = []
 
@@ -313,7 +332,8 @@ summary = {
         "test_serie": t["test_serie"],
         "main_result": t["results"]["main_result"],
         "test_duration": t["results"]["test_duration"],
-        "test_notes": t["notes"]
+        "test_notes": t["notes"],
+        "test_stats": t["stats"]
     } for t in tests],
     "level_results": {level.level: level.passed for level in levels[1:]},
     "level": global_level.level

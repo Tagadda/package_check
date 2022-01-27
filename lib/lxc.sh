@@ -28,6 +28,7 @@ LXC_CREATE () {
 
     _LXC_START_AND_WAIT $LXC_FULLNAME
     set_witness_files
+    MONITOR_STATS_SETUP
     lxc snapshot $LXC_FULLNAME snap0
 }
 
@@ -101,6 +102,15 @@ LXC_EXEC () {
     stop_timer 1
     # Return the exit code of the ssh command
     return $returncode
+}
+
+LXC_PULL () {
+    local path=$1
+    local dest=$2
+
+    _LXC_START_AND_WAIT $LXC_FULLNAME
+
+    lxc file pull $LXC_FULLNAME$1 $2
 }
 
 LXC_STOP () {

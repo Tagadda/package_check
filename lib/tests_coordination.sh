@@ -3,6 +3,7 @@
 source lib/lxc.sh
 source lib/tests.sh
 source lib/witness.sh
+source lib/monitor.sh
 
 readonly complete_log="./Complete-${WORKER_ID}.log"
 
@@ -248,6 +249,7 @@ run_all_tests() {
     mkdir -p $TEST_CONTEXT/tests
     mkdir -p $TEST_CONTEXT/results
     mkdir -p $TEST_CONTEXT/logs
+    mkdir -p $TEST_CONTEXT/monitor
 
     readonly app_id="$(jq -r .id $package_path/manifest.json)"
 
@@ -358,6 +360,8 @@ TEST_LAUNCHER () {
 
     local test_duration=$(echo $(( $(date +%s) - $global_start_timer )))
     SET_RESULT "$test_duration" test_duration
+
+    MONITOR_STATS_PROCCESSING
 
     break_before_continue
 
