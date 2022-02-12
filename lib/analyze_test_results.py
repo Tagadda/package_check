@@ -13,10 +13,7 @@ def load_tests(test_folder):
         j["id"] = os.path.basename(test).split(".")[0]
         j["results"] = json.load(open(test_folder + "/results/" + j["id"] + ".json"))
         j["notes"] = list(test_notes(j))
-        j["stats"] = {
-            "disk": list(test_disk_stats(j, test_folder)),
-            "ram": list(test_ram_usage(j, test_folder))
-        }
+        j["stats"] = test_stats(j, test_folder)
 
         yield j
 
@@ -48,20 +45,37 @@ def test_notes(test):
     if test['results'].get("install_dir_permissions"):
         yield '<style=danger>Unsafe install dir permissions</style>'
 
-def test_disk_stats(test, test_folder):
-    if test["test_type"] not in ["TEST_UPGRADE", "TEST_INSTALL"]:
-        return {}
+def test_stats(test, test_folder):
+    def sort_by_step(item):
+        return item.get('step')
 
-    for step in glob.glob(f"{test_folder}/monitor/{test['id']}/*-disk.json"):
-        yield [step, json.load(open(step))]
-        
+    def _retrieve_stats(test, test_folder, stattype):
+        if test["test_type"] not in ["TEST_UPGRADE", "TEST_INSTALL"]:
+            return
 
-def test_ram_usage(test, test_folder):
-    if test["test_type"] not in ["TEST_UPGRADE", "TEST_INSTALL"]:
-        return {}
+        for step in glob.glob(f"{test_folder}/monitor/{test['id']}/*-{stattype}.json"):
+            yield {"step": step.split('/')[-1].split('.')[0], "result": json.load(open(step))}
 
-    for step in glob.glob(f"{test_folder}/monitor/{test['id']}/*-ram.json"):
-        yield [step, json.load(open(step))]
+    def test_disk_stats(test, test_folder):
+        return _retrieve_stats(test, test_folder, "disk")
+            
+    def test_ram_usage(test, test_folder):
+        return _retrieve_stats(test, test_folder, "sysstat")
+
+    disk = list(test_disk_stats(test, test_folder))
+    disk.sort(key=sort_by_step)
+    ram = list(test_ram_usage(test, test_folder))
+    ram.sort(key=sort_by_step)
+
+    return { "disk": disk, "ram": ram }
+
+def convert_bytes(size):
+    for x in ['bytes', 'KB', 'MB', 'GB', 'TB']:
+        if size < 1000.0:
+            return "%3.2f %s" % (size, x)
+        size /= 1000.0
+
+    return size
 
 levels = []
 
@@ -215,7 +229,7 @@ def level_9(tests):
         and "App.qualify_for_level_9" in linter_tests[0]["results"]["success"]
 
 
-def make_summary():
+def make_summary(with_usage=False):
 
     test_types = {
         "PACKAGE_LINTER": "Package linter",
@@ -238,12 +252,25 @@ def make_summary():
             latest_test_serie = test["test_serie"]
             yield "------------- %s -------------" % latest_test_serie
 
+        if not "main_result" in test["results"]:
+            test["results"]["main_result"] = "failure" 
         result = " <style=success>OK</style>" if test["results"]["main_result"] == "success" else "<style=danger>fail</style>"
 
         if test["notes"]:
             result += "  (%s)" % ', '.join(test["notes"])
 
         yield "{test: <30}{result}".format(test=test_display_name, result=result)
+        if with_usage:
+
+            for disk in test["stats"]["disk"]:
+                before = float(disk["result"]["before"])
+                after = float(disk["result"]["after"])
+                diff = convert_bytes(after - before)
+                yield "disk usage on {step}: before={before} after={after} diff={diff}".format(step=disk['step'], before=convert_bytes(before), after=convert_bytes(after), diff=diff)
+            for ram in test["stats"]["ram"]:
+                usage = convert_bytes(float(ram["result"]["max"]) - float(ram["result"]["min"]))
+                yield "RAM usage on {step}: {usage}".format(step=ram['step'], usage=usage)
+
 
     yield ""
     yield "Level results"
@@ -310,7 +337,6 @@ tests = list(load_tests(test_context))
 global_level = None
 
 summary = '\n'.join(make_summary())
-print(render_for_terminal(summary))
 
 if os.path.exists("/usr/bin/wkhtmltoimage"):
     export_as_image(summary, f"{test_context}/summary.png")
@@ -318,6 +344,9 @@ if os.path.exists("/usr/bin/wkhtmltoimage"):
         os.system(f"/usr/bin/optipng --quiet '{test_context}/summary.png'")
 else:
     print("(Protip™ for CI admin: you should 'apt install wkhtmltopdf optipng --no-install-recommends' to enable result summary export to .png)")
+
+
+print(render_for_terminal('\n'.join(make_summary(with_usage=True))))
 
 summary = {
     "app": open(test_context + "/app_id").read().strip(),

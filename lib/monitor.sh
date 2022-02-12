@@ -1,7 +1,7 @@
 #!/bin/bash
 
 _monitor_get_df () {
-    LXC_EXEC "df / | grep -v Filesystem" >> $TEST_CONTEXT/monitor/$current_test_id/$1-df
+    LXC_EXEC "df / --sync | grep -v Filesystem" >> $TEST_CONTEXT/monitor/$current_test_id/$1-disk
 }
 
 _monitor_stats_new_step () {
@@ -25,11 +25,11 @@ _monitor_stats_clean () {
 
 # FIXME: This could come in the ynh-appci LXC image ?
 MONITOR_STATS_SETUP () {
-    LXC_EXEC "apt-get install sysstat -y"
+    LXC_EXEC "sh -c 'apt-get install sysstat -y > /dev/null'"
 }
 
 MONITOR_STATS_START () {
-    lxc exec $LXC_FULLNAME --quiet -- nohup /bin/bash -c "/usr/lib/sysstat/sadc 2 /tmp/monitordatafile &"
+    nohup lxc exec $LXC_FULLNAME -n -T -- /usr/lib/sysstat/sadc 2 /tmp/monitordatafile > /dev/null 2>&1 &
 
     _monitor_stats_new_step $1
 }
@@ -52,14 +52,15 @@ MONITOR_STATS_PROCCESSING () {
     [[ -d "$TEST_CONTEXT/monitor/$current_test_id/" ]] || return 1
 
     for sysstat in $TEST_CONTEXT/monitor/$current_test_id/*-sysstat ; do
-        max_ram_usage="$(sar -f $sysstat -r | awk '{print $5}' | sed -e 's/(\d+)/$1/' | sort -nr | head -n1)"
-        min_ram_usage="$(sar -f $sysstat -r | awk '{print $5}' | sed -e 's/(\d+)/$1/' | sort -n | head -n5 | tail -n1)"
-        echo "{\"min\":\"$min_ram_usage\", \"max\":\"$max_ram_usage\"}" > $sysstat-ram.json
+        ram_sorted="$(sar -f $sysstat -r | awk '{print $5}' | sed -e 's/(\d+)/$1/' | sort -nr )"
+        max_ram_usage="$(echo $ram_sorted | tr ' ' '\n' | head -n1)"
+        min_ram_usage="$(echo $ram_sorted | tr ' ' '\n' | tail -n4 | head -n1)"
+        echo "{\"min\":\"$min_ram_usage\", \"max\":\"$max_ram_usage\"}" > $sysstat.json
     done
 
-    for df in $TEST_CONTEXT/monitor/$current_test_id/*-df ; do
-        before="$(cat $df | head -n1 | awk '{print $3}' | sed -e 's/(\d+)/$1/')"
-        after="$(cat $df | tail -n1 | awk '{print $3}' | sed -e 's/(\d+)/$1/')"
-        echo "{\"before\":\"$before\", \"after\":\"$after\"}" > $df-disk.json
+    for disk in $TEST_CONTEXT/monitor/$current_test_id/*-disk ; do
+        before="$(cat $disk | head -n1 | awk '{print $3}' | sed -e 's/(\d+)/$1/')"
+        after="$(cat $disk | tail -n1 | awk '{print $3}' | sed -e 's/(\d+)/$1/')"
+        echo "{\"before\":\"$before\", \"after\":\"$after\"}" > $disk.json
     done
 }

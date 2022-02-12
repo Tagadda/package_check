@@ -51,6 +51,9 @@ function rebuild_base_lxc()
     $IN_LXC rm -f /etc/cron.daily/apt-compat
     $IN_LXC cp /bin/true /usr/lib/apt/apt.systemd.daily
 
+    # For RAM monitoring during tests
+    $IN_LXC cp /bin/true apt-get install sysstat -y
+
     # Disable password strength check
     $IN_LXC yunohost tools postinstall --domain $DOMAIN --password $YUNO_PWD --force-password
 
